@@ -80,6 +80,11 @@ app.post('/start-server', async (req, res) => {
           [`${port}/tcp`]: [{ HostPort: port }],
         },
         AutoRemove: true,
+
+        Memory: 2 * 1024 * 1024 * 1024, // 2 GB
+        CpuQuota: 30000,  // 30,000 microseconds
+        CpuPeriod: 10000 // 10,000 microseconds
+        
       },
       Env: [`PORT=${port}`], // Pass the port as an environment variable
     });
@@ -124,7 +129,14 @@ async function checkServerStatuses() {
       const container = docker.getContainer(`dyn-${port}`);
       const status = await container.inspect();
       if (status.State.Health.Status === 'healthy') {
+        // Update the server status
         serversList[port].status = 'running';
+        // Update CPU limits
+        await container.update({ // Default to 50% of CPU Core
+          CpuQuota: 5000,  // 5,000 microseconds
+          CpuPeriod: 10000 // 10,000 microseconds
+        });
+        console.log(`Server dyn-${port} updated with CPU limits.`);
       }
     } catch (err) {
       console.error('Error inspecting container:', err);
