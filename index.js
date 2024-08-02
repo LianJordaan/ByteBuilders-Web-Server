@@ -120,26 +120,52 @@ app.post('/stop-server', async (req, res) => {
 });
 
 async function checkServerStatuses() {
-  // Filter server list to only those marked as 'starting'
-  const startingPorts = Object.keys(serversList).filter(port => serversList[port].status === 'starting');
-
-  // Check if any servers are still starting by using docker.getContainer and checking the State to be healthy
-  for (const port of startingPorts) {
+  // Iterate through all servers in the list
+  for (const port of Object.keys(serversList)) {
+    const server = serversList[port];
+    
     try {
       const container = docker.getContainer(`dyn-${port}`);
       const status = await container.inspect();
-      if (status.State.Health.Status === 'healthy') {
-        // Update the server status
-        serversList[port].status = 'running';
-        // Update CPU limits
-        await container.update({ // Default to 50% of CPU Core
-          CpuQuota: 5000,  // 5,000 microseconds
-          CpuPeriod: 10000 // 10,000 microseconds
-        });
-        console.log(`Server dyn-${port} updated with CPU limits.`);
+
+      if (server.status === 'starting') {
+        // Check if the server in 'starting' status is healthy
+        if (status.State.Health.Status === 'healthy') {
+          // Update the server status to 'running'
+          server.status = 'running';
+          
+          // Update CPU limits
+          await container.update({ // Default to 50% of CPU Core
+            CpuQuota: 5000,  // 5,000 microseconds
+            CpuPeriod: 10000 // 10,000 microseconds
+          });
+          console.log(`Server dyn-${port} updated with CPU limits.`);
+        }
+      } else if (server.status === 'running') {
+        // Check if the server in 'running' status is still healthy
+        if (status.State.Status === 'running' && status.State.Health && status.State.Health.Status === 'healthy') {
+          // Container is healthy and running; no action needed here
+        } else {
+          console.log(`Server dyn-${port} is not healthy or not running.`);
+          // Stop the container if it is still running
+          if (status.State.Status === 'running') {
+            await container.stop();
+            console.log(`Stopped container dyn-${port}.`);
+          }
+          // Update server status to 'stopped' and remove from the list
+          server.status = 'stopped';
+          delete serversList[port];
+        }
       }
     } catch (err) {
-      console.error('Error inspecting container:', err);
+      // Check if the error is due to the container not existing
+      if (err.statusCode === 404) {
+        console.log(`Container dyn-${port} does not exist. Removing from server list.`);
+        // Remove the server entry from the list
+        delete serversList[port];
+      } else {
+        console.error('Error inspecting container:', err);
+      }
     }
   }
 }
