@@ -7,7 +7,8 @@ const Docker = require('dockerode');
 const app = express();
 const docker = new Docker({ socketPath: '//./pipe/docker_engine' });
 
-var serversList = [];
+var serversList = {};
+loadServerInfo();
 
 // Middleware to parse JSON bodies
 app.use(bodyParser.json());
@@ -183,6 +184,38 @@ async function checkServerStatuses() {
 }
 
 setInterval(checkServerStatuses, 5000);
+
+function saveServerInfo() {
+  fs.writeFileSync('serverInfo.json', JSON.stringify(serversList, null, 2), 'utf-8');
+  console.log('Server info saved to serverInfo.json');
+}
+
+function loadServerInfo() {
+  try {
+    const data = fs.readFileSync('serverInfo.json', 'utf-8');
+    serversList = JSON.parse(data);
+    console.log('Server info loaded from serverInfo.json');
+  } catch (err) {
+    console.error('Error loading server info:', err);
+    // Initialize serversList as an empty object if the file does not exist
+    serversList = {};
+  }
+}
+
+// Graceful shutdown handler to save server info
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  saveServerInfo();
+  // Close other connections and cleanup...
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT signal received: closing HTTP server');
+  saveServerInfo();
+  // Close other connections and cleanup...
+  process.exit(0);
+});
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
