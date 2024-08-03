@@ -59,10 +59,10 @@ app.get('/plot-status', async (req, res) => {
 });
 
 app.post('/start-server', async (req, res) => {
-  const { port, plotId } = req.body;
+  const { port } = req.body;
 
-  if (!port || !plotId) {
-    return res.status(400).send({ success: false, message: 'port and plotId are required.' });
+  if (!port) {
+    return res.status(400).send({ success: false, message: 'port is required.' });
   }
 
   try {
