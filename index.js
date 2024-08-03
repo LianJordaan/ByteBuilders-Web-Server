@@ -102,6 +102,18 @@ app.post('/start-server', async (req, res) => {
   }
 });
 
+app.get('/list-server-statuses', async (req, res) => {
+  let statusObject = {};
+  for (const port of Object.keys(serversList)) {
+    const server = serversList[port];
+    statusObject[port] = {
+      status: server.status,
+      plotId: server.plotId
+    };
+  }
+  res.send(statusObject);
+});
+
 app.post('/stop-server', async (req, res) => {
   const { port } = req.body;
 
