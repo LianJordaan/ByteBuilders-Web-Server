@@ -82,6 +82,7 @@ app.post('/start-server', async (req, res) => {
         },
         AutoRemove: true,
 
+        DiskQuota: 1 * 1024 * 1024 * 1024, // 1 GB
         Memory: 2 * 1024 * 1024 * 1024, // 2 GB
         CpuQuota: 30000,  // 30,000 microseconds
         CpuPeriod: 10000 // 10,000 microseconds
