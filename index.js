@@ -5,9 +5,16 @@ const bodyParser = require("body-parser"); // To parse JSON bodies
 const Docker = require("dockerode");
 const http = require("http");
 const WebSocket = require("ws");
+const multer = require('multer');
 const dotenv = require("dotenv");
 const url = require("url");
 const { type } = require("os");
+const upload = multer({ dest: 'data/' });
+
+const dataFolderPath = path.join(__dirname, 'data');
+if (!fs.existsSync(dataFolderPath)) {
+    fs.mkdirSync(dataFolderPath);
+}
 
 dotenv.config();
 
@@ -137,6 +144,29 @@ app.get("/list-server-statuses", async (req, res) => {
 		};
 	}
 	res.send(statusObject);
+});
+
+app.post('/savedata', upload.single('file'), (req, res) => {
+    const { port } = req.body;
+
+    if (!port) {
+        return res.status(400).send({ success: false, message: 'Port is required.' });
+    }
+
+    if (!req.file) {
+        return res.status(400).send({ success: false, message: 'File is required.' });
+    }
+
+    // Save the file with the port as its name
+    const oldPath = req.file.path;
+    const newPath = path.join(dataFolderPath, `${port}.zip`);
+
+    fs.rename(oldPath, newPath, (err) => {
+        if (err) {
+            return res.status(500).send({ success: false, message: 'Failed to save file.' });
+        }
+        res.send({ success: true, message: 'Data saved successfully' });
+    });
 });
 
 app.post("/stop-server", async (req, res) => {
