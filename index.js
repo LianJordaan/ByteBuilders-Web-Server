@@ -5,8 +5,9 @@ const bodyParser = require("body-parser"); // To parse JSON bodies
 const Docker = require("dockerode");
 const http = require("http");
 const WebSocket = require("ws");
-const dotenv = require('dotenv');
-const url = require('url');
+const dotenv = require("dotenv");
+const url = require("url");
+const { type } = require("os");
 
 dotenv.config();
 
@@ -16,7 +17,7 @@ const wss = new WebSocket.Server({ noServer: true });
 
 const docker = new Docker({ socketPath: "//./pipe/docker_engine" });
 
-const VALID_USERNAMES = process.env.VALID_USERNAMES ? process.env.VALID_USERNAMES.split(',') : [];
+const VALID_USERNAMES = process.env.VALID_USERNAMES ? process.env.VALID_USERNAMES.split(",") : [];
 var serversList = {};
 loadServerInfo();
 
@@ -244,42 +245,68 @@ process.on("SIGINT", () => {
 	process.exit(0);
 });
 
+const clients = new Map(); // Store connected clients with unique IDs
+
 // Handle WebSocket upgrade requests
-server.on('upgrade', (request, socket, head) => {
-    const { query } = url.parse(request.url, true);
-    const username = query.username;
+server.on("upgrade", (request, socket, head) => {
+	const { query } = url.parse(request.url, true);
+	const username = query.username;
 
-    // Validate username
-    if (!VALID_USERNAMES.includes(username)) {
-        socket.destroy(); // Reject connection if username is invalid
-        console.log('WebSocket connection rejected due to invalid username');
-        return;
-    }
+	// Validate username
+	if (!VALID_USERNAMES.includes(username)) {
+		socket.destroy(); // Reject connection if username is invalid
+		console.log("WebSocket connection rejected due to invalid username");
+		return;
+	}
 
-    // Proceed with WebSocket upgrade if username is valid
-    wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit('connection', ws, request);
-    });
+	// Proceed with WebSocket upgrade if username is valid
+	wss.handleUpgrade(request, socket, head, (ws) => {
+		wss.emit("connection", ws, request);
+	});
 });
 
-wss.on('connection', (ws) => {
-    console.log('WebSocket client connected with valid username');
+wss.on("connection", (ws, req) => {
+	const urlParams = new URLSearchParams(req.url.split("?")[1]);
+	const username = urlParams.get("username"); // Get username from URL
+	const id = urlParams.get("id"); // Get unique ID from URL
 
-    ws.on('message', (message) => {
-        try {
-            const parsedMessage = JSON.parse(message);
-            console.log('Received message:', parsedMessage);
-        } catch (error) {
-            ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
-        }
-    });
+	// Add client to the map
+	clients.set(id, ws);
 
-    ws.on('close', (code, reason) => {
-        console.log('WebSocket client disconnected');
-    });
+	//client registered with unique id
+	console.log(`Client registered with id: ${id}`);
 
-    // Send initial message
-    ws.send(JSON.stringify({ type: 'info', message: 'Connection established' }));
+	ws.on("message", (message) => {
+		try {
+			const parsedMessage = JSON.parse(message);
+			console.log("Received message:", parsedMessage);
+
+			// Check if the message needs to be forwarded
+			if (parsedMessage.targetId && clients.has(parsedMessage.targetId)) {
+				//example json to trigger forwarding
+				//{"type":"forwarded-message","targetId":"25566","message":"Hello, this is a forwarded message!"}
+
+				const targetClient = clients.get(parsedMessage.targetId);
+				targetClient.send(
+					JSON.stringify({
+						type: "forwarded-message",
+						from: username,
+						message: parsedMessage.message,
+					})
+				);
+			}
+		} catch (error) {
+			ws.send(JSON.stringify({ type: "error", message: "Invalid message format! Please use json format." }));
+		}
+	});
+
+	ws.on("close", (code, reason) => {
+		console.log("WebSocket client disconnected");
+		clients.delete(id); // Remove client from the map
+	});
+
+	// Send initial message
+	ws.send(JSON.stringify({ type: "info", message: "Connection established" }));
 });
 
 const port = process.env.PORT || 3000;
