@@ -306,7 +306,7 @@ wss.on("connection", (ws, req) => {
 	//client registered with unique id
 	console.log(`Client registered with id: ${id}`);
 
-	ws.on("message", (message) => {
+	ws.on("message", async (message) => {
 		try {
 			const parsedMessage = JSON.parse(message);
 			console.log("Received message:", parsedMessage);
@@ -320,10 +320,43 @@ wss.on("connection", (ws, req) => {
 				targetClient.send(
 					JSON.stringify({
 						type: "forwarded-message",
-						from: username,
+						from: id,
 						message: parsedMessage.message,
 					})
 				);
+			}
+
+			//example of json to trigger status update
+			//{"type": "status", "status": "running"}
+			if (parsedMessage.type === "status") {
+				if (parsedMessage.type === "status" && parsedMessage.status) {
+					if (serversList[id]) {
+						serversList[id].status = parsedMessage.status;
+						if (parsedMessage.status === "running") {
+							try {
+								const container = docker.getContainer(`dyn-${id}`);
+								await container.update({
+									// Default to 50% of CPU Core
+									CpuQuota: 5000, // 5,000 microseconds
+									CpuPeriod: 10000, // 10,000 microseconds
+								});
+								console.log(`Server dyn-${id} updated with CPU limits.`);
+							} catch (err) {
+								if (err.statusCode === 404) {
+									console.log(`Container dyn-${port} does not exist. Removing from server list.`);
+									// Remove the server entry from the list
+									delete serversList[port];
+								} else {
+									console.error("Error inspecting container:", err);
+								}
+							}
+						}
+						if (parsedMessage.status === "stopped") {
+							delete serversList[id];
+						}
+						console.log(`Updated status of server ${id} to ${parsedMessage.status}`);
+					}
+				}
 			}
 		} catch (error) {
 			ws.send(JSON.stringify({ type: "error", message: "Invalid message format! Please use json format." }));
