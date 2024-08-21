@@ -29,6 +29,7 @@ loadServerInfo();
 // Middleware to parse JSON bodies
 app.use(bodyParser.json());
 app.use(express.json()); // Make sure you can parse JSON request bodies
+app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, "public")));
