@@ -5,11 +5,9 @@ const bodyParser = require("body-parser"); // To parse JSON bodies
 const Docker = require("dockerode");
 const http = require("http");
 const WebSocket = require("ws");
-const multer = require('multer');
 const dotenv = require("dotenv");
 const url = require("url");
 const { type } = require("os");
-const upload = multer({ dest: 'data/' });
 
 const dataFolderPath = path.join(__dirname, 'data');
 if (!fs.existsSync(dataFolderPath)) {
