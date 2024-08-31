@@ -104,7 +104,7 @@ app.post("/start-server", async (req, res) => {
 				PortBindings: {
 					[`${port}/tcp`]: [{ HostPort: port }],
 				},
-				AutoRemove: true,
+				// AutoRemove: true,
 
 				DiskQuota: 1 * 1024 * 1024 * 1024, // 1 GB
 				Memory: 2 * 1024 * 1024 * 1024, // 2 GB
@@ -200,8 +200,8 @@ async function checkServerStatuses() {
 						console.log(`Stopped container dyn-${port}.`);
 					}
 					// Update server status to 'stopped' and remove from the list
-					server.status = "stopped";
-					delete serversList[port];
+					server.status = "saving";
+					// delete serversList[port];
 				}
 			}
 		} catch (err) {
@@ -327,7 +327,7 @@ wss.on("connection", (ws, req) => {
 								}
 							}
 						}
-						if (parsedMessage.status === "stopped") {
+						if (parsedMessage.status === "stopping") {
 							delete serversList[id];
 						}
 						console.log(`Updated status of server ${id} to ${parsedMessage.status}`);
