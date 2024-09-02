@@ -11,6 +11,8 @@ const archiver = require('archiver'); // Use the 'archiver' package to create a 
 const tar = require('tar'); // Required for extracting files from the Docker container
 const { type } = require("os");
 
+const IDLE_SERVER_COUNT = 2;
+
 const dataFolderPath = path.join(__dirname, 'data');
 if (!fs.existsSync(dataFolderPath)) {
     fs.mkdirSync(dataFolderPath);
@@ -95,6 +97,14 @@ app.post("/start-server", async (req, res) => {
 	for (const port of Object.keys(serversList)) {
 		if (serversList[port].status === "running" && serversList[port].plotId == id) {
 			return res.status(409).send({ success: false, port: port, message: "Server is already running." });
+		}
+	}
+
+	//check if there is a server inside serverList that is in a starting status with no id assigned
+	for (const port of Object.keys(serversList)) {
+		if (serversList[port].status === "starting" && !serversList[port].plotId) {
+			// If there is a server with status starting and no id assigned
+			return res.status(202).send({ success: false, port: port, message: "A server is starting, please wait for it to become available." });
 		}
 	}
 
@@ -262,6 +272,60 @@ async function checkServerStatuses() {
 			}
 		}
 	}
+
+	await ensureServerAvailable();
+}
+
+async function ensureServerAvailable() {
+    // Count the number of servers in "running" or "starting" state without an ID
+    const countServersWithoutId = Object.values(serversList).filter(server => 
+        (server.status === "running" || server.status === "starting") && !server.plotId
+    ).length;
+
+    if (countServersWithoutId < IDLE_SERVER_COUNT) {
+        // Less than two servers found, start a new one
+        console.log("Less than two servers without an ID found. Starting a new one...");
+        await startServerWithoutId();
+    }
+}
+
+async function startServerWithoutId() {
+    try {
+        const startingPort = 25566;
+        const nextPort = findNextAvailablePort(startingPort);
+
+        if (!nextPort) {
+            console.error("No available ports to start a new server.");
+            return;
+        }
+
+        const imageName = "minecraft-server";
+        const containerName = `dyn-${nextPort}`;
+
+        const container = await docker.createContainer({
+            Image: imageName,
+            name: containerName,
+            ExposedPorts: { [`${nextPort}/tcp`]: {} },
+            HostConfig: {
+                PortBindings: {
+                    [`${nextPort}/tcp`]: [{ HostPort: nextPort.toString() }],
+                },
+                DiskQuota: 1 * 1024 * 1024 * 1024, // 1 GB
+                Memory: 2 * 1024 * 1024 * 1024, // 2 GB
+                CpuQuota: 30000, // 30,000 microseconds
+                CpuPeriod: 10000, // 10,000 microseconds
+            },
+            Env: [`PORT=${nextPort}`],
+        });
+
+        await container.start();
+
+        serversList[nextPort] = { plotId: null, status: "starting" };
+
+        console.log(`New server started without ID on port ${nextPort}.`);
+    } catch (err) {
+        console.error("Error starting a server without ID:", err);
+    }
 }
 
 // Function to copy files from the Docker container to the temporary folder
