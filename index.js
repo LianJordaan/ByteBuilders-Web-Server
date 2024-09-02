@@ -100,20 +100,20 @@ app.post("/start-server", async (req, res) => {
 		}
 	}
 
-	//check if there is a server inside serverList that is in a starting status with no id assigned
-	for (const port of Object.keys(serversList)) {
-		if (serversList[port].status === "starting" && !serversList[port].plotId) {
-			// If there is a server with status starting and no id assigned
-			return res.status(202).send({ success: false, port: port, message: "A server is starting, please wait for it to become available." });
-		}
-	}
-
 	//check if there is a server inside serverList that is status running with no id assigned
 	for (const port of Object.keys(serversList)) {
 		if (serversList[port].status === "running" && !serversList[port].plotId) {
 			// If there is a server with status running and no id assigned, set id to the expected id and return good reponse
 			serversList[port].plotId = id;
 			return res.status(200).send({ success: true, port: port, message: "Empty server found and assigned id." });
+		}
+	}
+
+	//check if there is a server inside serverList that is in a starting status with no id assigned
+	for (const port of Object.keys(serversList)) {
+		if (serversList[port].status === "starting" && !serversList[port].plotId) {
+			// If there is a server with status starting and no id assigned
+			return res.status(202).send({ success: false, port: port, message: "A server is starting, please wait for it to become available." });
 		}
 	}
 
