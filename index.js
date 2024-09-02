@@ -7,6 +7,8 @@ const http = require("http");
 const WebSocket = require("ws");
 const dotenv = require("dotenv");
 const url = require("url");
+const archiver = require('archiver'); // Use the 'archiver' package to create a ZIP file
+const tar = require('tar'); // Required for extracting files from the Docker container
 const { type } = require("os");
 
 const dataFolderPath = path.join(__dirname, 'data');
@@ -84,54 +86,97 @@ app.get("/plot-status", async (req, res) => {
 });
 
 app.post("/start-server", async (req, res) => {
-	const { port } = req.body;
+    const { id } = req.body;
 
-	if (!port) {
-		return res.status(400).send({ success: false, message: "port is required." });
+    if (!id) {
+        return res.status(400).send({ success: false, message: "id is required." });
+    }
+
+	for (const port of Object.keys(serversList)) {
+		if (serversList[port].status === "running" && serversList[port].plotId == id) {
+			return res.status(409).send({ success: false, port: port, message: "Server is already running." });
+		}
 	}
 
-	try {
-		// Define the image and container name
-		const imageName = "minecraft-server"; // Use your Docker image name
-		const containerName = `dyn-${port}`;
-
-		// Create and start the container
-		const container = await docker.createContainer({
-			Image: imageName,
-			name: containerName,
-			ExposedPorts: { [`${port}/tcp`]: {} },
-			HostConfig: {
-				PortBindings: {
-					[`${port}/tcp`]: [{ HostPort: port }],
-				},
-				// AutoRemove: true,
-
-				DiskQuota: 1 * 1024 * 1024 * 1024, // 1 GB
-				Memory: 2 * 1024 * 1024 * 1024, // 2 GB
-				CpuQuota: 30000, // 30,000 microseconds
-				CpuPeriod: 10000, // 10,000 microseconds
-			},
-			Env: [`PORT=${port}`], // Pass the port as an environment variable
-		});
-
-		// Start the container
-		await container.start();
-
-		serversList[port] = { plotId: null, status: "starting" };
-
-		// Send response once everything is done
-		res.send({
-			success: true,
-			message: `Container ${containerName} started on port ${port}.`,
-		});
-	} catch (err) {
-		console.error("Error starting container:", err);
-		res.status(500).send({
-			success: false,
-			message: "Failed to start container.",
-		});
+	//check if there is a server inside serverList that is status running with no id assigned
+	for (const port of Object.keys(serversList)) {
+		if (serversList[port].status === "running" && !serversList[port].plotId) {
+			// If there is a server with status running and no id assigned, set id to the expected id and return good reponse
+			serversList[port].plotId = id;
+			return res.status(200).send({ success: true, port: port, message: "Empty server found and assigned id." });
+		}
 	}
+
+    try {
+        // Find the next available port starting from 25566
+        const startingPort = 25566;
+        const nextPort = findNextAvailablePort(startingPort);
+
+        if (!nextPort) {
+            return res.status(500).send({
+                success: false,
+                message: "No available ports to start a new server.",
+            });
+        }
+
+        // Define the image and container name
+        const imageName = "minecraft-server"; // Use your Docker image name
+        const containerName = `dyn-${nextPort}`;
+
+        // Create and start the container
+        const container = await docker.createContainer({
+            Image: imageName,
+            name: containerName,
+            ExposedPorts: { [`${nextPort}/tcp`]: {} },
+            HostConfig: {
+                PortBindings: {
+                    [`${nextPort}/tcp`]: [{ HostPort: nextPort.toString() }],
+                },
+                // AutoRemove: true,
+                DiskQuota: 1 * 1024 * 1024 * 1024, // 1 GB
+                Memory: 2 * 1024 * 1024 * 1024, // 2 GB
+                CpuQuota: 30000, // 30,000 microseconds
+                CpuPeriod: 10000, // 10,000 microseconds
+            },
+            Env: [`PORT=${nextPort}`], // Pass the port as an environment variable
+        });
+
+        // Start the container
+        await container.start();
+
+        serversList[nextPort] = { plotId: null, status: "starting" };
+
+        // Send response once everything is done
+        res.status(404).send({
+            success: true,
+            message: `Container ${containerName} starting on port ${nextPort}.`,
+        });
+    } catch (err) {
+        console.error("Error starting container:", err);
+        res.status(500).send({
+            success: false,
+            message: "Failed to start container.",
+        });
+    }
 });
+
+// Function to find the next available port
+function findNextAvailablePort(startingPort) {
+    let port = startingPort;
+    
+    // Iterate to find the next available port
+    while (serversList[port] !== undefined) {
+        port++;
+    }
+
+    // Check if the port is within a valid range
+    if (port > 26000) {
+        // No available ports found within range
+        return null;
+    }
+
+    return port;
+}
 
 app.get("/list-server-statuses", async (req, res) => {
 	let statusObject = {};
@@ -169,28 +214,15 @@ async function checkServerStatuses() {
 	// Iterate through all servers in the list
 	for (const port of Object.keys(serversList)) {
 		const server = serversList[port];
+		let id = server.plotId;
 
 		try {
 			const container = docker.getContainer(`dyn-${port}`);
 			const status = await container.inspect();
 
-			if (server.status === "starting") {
-				// Check if the server in 'starting' status is healthy
-				if (status.State.Health.Status === "healthy") {
-					// Update the server status to 'running'
-					server.status = "running";
-
-					// Update CPU limits
-					await container.update({
-						// Default to 50% of CPU Core
-						CpuQuota: 5000, // 5,000 microseconds
-						CpuPeriod: 10000, // 10,000 microseconds
-					});
-					console.log(`Server dyn-${port} updated with CPU limits.`);
-				}
-			} else if (server.status === "running") {
+			if (server.status === "running") {
 				// Check if the server in 'running' status is still healthy
-				if (status.State.Status === "running" && status.State.Health && status.State.Health.Status === "healthy") {
+				if (status.State.Status === "running") {
 					// Container is healthy and running; no action needed here
 				} else {
 					console.log(`Server dyn-${port} is not healthy or not running.`);
@@ -200,10 +232,25 @@ async function checkServerStatuses() {
 						console.log(`Stopped container dyn-${port}.`);
 					}
 					// Update server status to 'stopped' and remove from the list
-					server.status = "saving";
+					server.status = "stopping";
 					// delete serversList[port];
 				}
-			}
+			} else if (server.status === "stopping") {
+                if (status.State.Status !== "running") {
+                    console.log(`Server dyn-${port} is stopping and container is not running.`);
+                    server.status = "saving";
+
+                    // Copy files from the Docker container
+                    await copyFilesFromContainer(container, port);
+
+                    // Zip the copied files
+                    await zipServerFiles(port, id);
+
+					container.remove();
+                    server.status = "stopped";
+                    delete serversList[port];
+                }
+            }
 		} catch (err) {
 			// Check if the error is due to the container not existing
 			if (err.statusCode === 404) {
@@ -215,6 +262,72 @@ async function checkServerStatuses() {
 			}
 		}
 	}
+}
+
+// Function to copy files from the Docker container to the temporary folder
+async function copyFilesFromContainer(container, port) {
+    // Define paths inside the container
+    const containerPaths = [
+        "/minecraft/world",
+        "/minecraft/plugins"
+    ];
+
+    // Define the temporary folder for this server backup
+    const tempFolder = path.join(__dirname, 'temp', `dyn-${port}`);
+
+    // Create the temporary directory if it does not exist
+    fs.mkdirSync(tempFolder, { recursive: true });
+
+    // Copy each folder from the container to the temporary directory
+    for (const path of containerPaths) {
+        const stream = await container.getArchive({ path });
+
+        await new Promise((resolve, reject) => {
+            stream.pipe(
+                tar.x({ cwd: tempFolder }) // Extract the files to the temporary folder
+                    .on('finish', resolve)
+                    .on('error', reject)
+            );
+        });
+
+        console.log(`Copied ${path} from container dyn-${port} to temporary folder.`);
+    }
+}
+
+// Function to zip the copied server files and clean up
+async function zipServerFiles(port, id) {
+    // Define the temporary folder and the final zip destination
+    const tempFolder = path.join(__dirname, 'temp', `dyn-${port}`);
+    const zipDestination = path.join(__dirname, 'data', `plot-${id}`, `data.zip`);
+
+    // Ensure the parent directory for the zip exists
+    fs.mkdirSync(path.dirname(zipDestination), { recursive: true });
+
+    const output = fs.createWriteStream(zipDestination);
+    const archive = archiver('zip', { zlib: { level: 9 } }); // Maximum compression
+
+    output.on('close', () => {
+        console.log(`Backup for server dyn-${port} completed: ${archive.pointer()} total bytes.`);
+
+        // Delete the temporary folder after zipping
+        fs.rm(tempFolder, { recursive: true, force: true }, (err) => {
+            if (err) console.error(`Error deleting temporary folder: ${err}`);
+            else console.log(`Temporary folder deleted: ${tempFolder}`);
+        });
+    });
+
+    archive.on('error', (err) => {
+        throw err;
+    });
+
+    // Connect the archive stream to the output file
+    archive.pipe(output);
+
+    // Add folders to the ZIP file
+    archive.directory(path.join(tempFolder, 'world'), 'world');
+    archive.directory(path.join(tempFolder, 'plugins'), 'plugins');
+
+    await archive.finalize(); // Finalize the ZIP file
 }
 
 setInterval(checkServerStatuses, 5000);
@@ -327,9 +440,9 @@ wss.on("connection", (ws, req) => {
 								}
 							}
 						}
-						if (parsedMessage.status === "stopping") {
-							delete serversList[id];
-						}
+						// if (parsedMessage.status === "stopping") {
+						// 	delete serversList[id];
+						// }
 						console.log(`Updated status of server ${id} to ${parsedMessage.status}`);
 					}
 				}
