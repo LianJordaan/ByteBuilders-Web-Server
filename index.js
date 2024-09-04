@@ -144,7 +144,7 @@ app.post("/start-server", async (req, res) => {
                 },
                 // AutoRemove: true,
                 DiskQuota: 1 * 1024 * 1024 * 1024, // 1 GB
-                Memory: 2 * 1024 * 1024 * 1024, // 2 GB
+                Memory: 1 * 1024 * 1024 * 1024, // 1 GB
                 CpuQuota: 30000, // 30,000 microseconds
                 CpuPeriod: 10000, // 10,000 microseconds
             },
@@ -224,6 +224,11 @@ async function checkServerStatuses() {
 	// Iterate through all servers in the list
 	for (const port of Object.keys(serversList)) {
 		const server = serversList[port];
+		if (!server) {
+			console.warn(`Server with port ${port} is undefined. Skipping...`);
+			continue; // Skip to the next iteration if server is undefined
+		}
+
 		let id = server.plotId;
 
 		try {
@@ -248,15 +253,16 @@ async function checkServerStatuses() {
 			} else if (server.status === "stopping") {
                 if (status.State.Status !== "running") {
                     console.log(`Server dyn-${port} is stopping and container is not running.`);
-                    server.status = "saving";
+					if (id) {
+						server.status = "saving";
 
-                    // Copy files from the Docker container
-                    await copyFilesFromContainer(container, port);
+						// Copy files from the Docker container
+						await copyFilesFromContainer(container, port);
 
-                    // Zip the copied files
-                    await zipServerFiles(port, id);
-
-					container.remove();
+						// Zip the copied files
+						await zipServerFiles(port, id);
+					}
+					await container.remove();
                     server.status = "stopped";
                     delete serversList[port];
                 }
@@ -311,7 +317,7 @@ async function startServerWithoutId() {
                     [`${nextPort}/tcp`]: [{ HostPort: nextPort.toString() }],
                 },
                 DiskQuota: 1 * 1024 * 1024 * 1024, // 1 GB
-                Memory: 2 * 1024 * 1024 * 1024, // 2 GB
+                Memory: 1 * 1024 * 1024 * 1024, // 1 GB
                 CpuQuota: 30000, // 30,000 microseconds
                 CpuPeriod: 10000, // 10,000 microseconds
             },
