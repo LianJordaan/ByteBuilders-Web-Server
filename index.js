@@ -11,7 +11,7 @@ const archiver = require('archiver'); // Use the 'archiver' package to create a 
 const tar = require('tar'); // Required for extracting files from the Docker container
 const { type } = require("os");
 
-const IDLE_SERVER_COUNT = 2;
+const IDLE_SERVER_COUNT = 1;
 
 const dataFolderPath = path.join(__dirname, 'data');
 if (!fs.existsSync(dataFolderPath)) {
@@ -334,12 +334,17 @@ async function startServerWithoutId() {
     }
 }
 
+function shouldExclude(filePath, excludePatterns) {
+    return excludePatterns.some(pattern => filePath.includes(pattern));
+}
+
 // Function to copy files from the Docker container to the temporary folder
 async function copyFilesFromContainer(container, port) {
     // Define paths inside the container
     const containerPaths = [
         "/minecraft/world",
-        "/minecraft/plugins"
+        "/minecraft/plugins",
+        "/minecraft/logs"
     ];
 
     // Define the temporary folder for this server backup
@@ -348,19 +353,35 @@ async function copyFilesFromContainer(container, port) {
     // Create the temporary directory if it does not exist
     fs.mkdirSync(tempFolder, { recursive: true });
 
+    // Define exclusions (folder or file patterns)
+    const excludePatterns = [
+        "/minecraft/logs/latest.log", // Exclude specific file
+        "/minecraft/plugins/debug"    // Exclude specific folder
+    ];
+
     // Copy each folder from the container to the temporary directory
-    for (const path of containerPaths) {
-        const stream = await container.getArchive({ path });
+    for (const containerPath of containerPaths) {
+        const stream = await container.getArchive({ path: containerPath });
 
         await new Promise((resolve, reject) => {
             stream.pipe(
-                tar.x({ cwd: tempFolder }) // Extract the files to the temporary folder
-                    .on('finish', resolve)
-                    .on('error', reject)
+                tar.x({
+                    cwd: tempFolder, // Extract the files to the temporary folder
+                    filter: (filePath) => {
+                        // Apply the exclusion filter
+                        if (shouldExclude(filePath, excludePatterns)) {
+                            console.log(`Excluding ${filePath} from the backup.`);
+                            return false; // Exclude this file/folder
+                        }
+                        return true; // Include this file/folder
+                    }
+                })
+                .on('finish', resolve)
+                .on('error', reject)
             );
         });
 
-        console.log(`Copied ${path} from container dyn-${port} to temporary folder.`);
+        console.log(`Copied ${containerPath} from container dyn-${port} to temporary folder.`);
     }
 }
 
