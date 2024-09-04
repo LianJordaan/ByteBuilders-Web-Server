@@ -9,6 +9,7 @@ const dotenv = require("dotenv");
 const url = require("url");
 const archiver = require('archiver'); // Use the 'archiver' package to create a ZIP file
 const tar = require('tar'); // Required for extracting files from the Docker container
+const minimatch = require('minimatch');
 const { type } = require("os");
 
 const IDLE_SERVER_COUNT = 1;
@@ -334,18 +335,20 @@ async function startServerWithoutId() {
     }
 }
 
+// Function to check if a file path should be excluded based on patterns
 function shouldExclude(filePath, excludePatterns) {
-    return excludePatterns.some(pattern => filePath.includes(pattern));
+    return excludePatterns.some(pattern => minimatch(filePath, pattern));
 }
 
 // Function to copy files from the Docker container to the temporary folder
 async function copyFilesFromContainer(container, port) {
-    // Define paths inside the container
-    const containerPaths = [
-        "/minecraft/world",
-        "/minecraft/plugins",
-        "/minecraft/logs"
-    ];
+    // Define paths inside the container, including wildcards
+	const containerPaths = [
+		"/minecraft/world*/",
+		"/minecraft/custom-dim*/",
+		"/minecraft/plugins/",
+		"/minecraft/vars.json"
+	];	
 
     // Define the temporary folder for this server backup
     const tempFolder = path.join(__dirname, 'temp', `dyn-${port}`);
@@ -355,8 +358,7 @@ async function copyFilesFromContainer(container, port) {
 
     // Define exclusions (folder or file patterns)
     const excludePatterns = [
-        "/minecraft/logs/latest.log", // Exclude specific file
-        "/minecraft/plugins/debug"    // Exclude specific folder
+        "**/plugins/.paper-remapped/", // Exclude specific folder
     ];
 
     // Copy each folder from the container to the temporary directory
