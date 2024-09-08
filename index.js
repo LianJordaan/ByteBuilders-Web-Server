@@ -393,7 +393,7 @@ async function ensureServerAvailable() {
 
     if (countServersWithoutId < IDLE_SERVER_COUNT) {
         // Less than two servers found, start a new one
-        console.log("Less than two servers without an ID found. Starting a new one...");
+        console.log(`Less than ${IDLE_SERVER_COUNT} servers without an ID found. Starting a new one...`);
         await startServerWithoutId();
     }
 }
@@ -420,9 +420,12 @@ async function startServerWithoutId() {
                     [`${nextPort}/tcp`]: [{ HostPort: nextPort.toString() }],
                 },
                 DiskQuota: 1 * 1024 * 1024 * 1024, // 1 GB
-                Memory: 1 * 1024 * 1024 * 1024, // 1 GB
+                Memory: 1.5 * 1024 * 1024 * 1024, // 1.5 GB
+				MemorySwap: 1.5 * 1024 * 1024 * 1024, // 1.5 GB
+				MemorySwappiness: 100, // 100% prever swap
                 CpuQuota: 30000, // 30,000 microseconds
                 CpuPeriod: 10000, // 10,000 microseconds
+				OomKillDisable: true, // Disable OOM Killer
             },
             Env: [`PORT=${nextPort}`],
         });
