@@ -440,55 +440,49 @@ async function startServerWithoutId() {
     }
 }
 
-// Function to check if a file path should be excluded based on patterns
-function shouldExclude(filePath, excludePatterns) {
-    return excludePatterns.some(pattern => minimatch(filePath, pattern));
-}
+const execPromise = util.promisify(exec);
 
-// Function to copy files from the Docker container to the temporary folder
 async function copyFilesFromContainer(container, port) {
-    // Define paths inside the container, including wildcards
-	const containerPaths = [
-		"/minecraft/world*/",
-		"/minecraft/custom-dim*/",
-		"/minecraft/plugins/",
-		"/minecraft/vars.json"
-	];	
+    // Inspect the container to get detailed information
+    const data = await container.inspect();
+    const containerName = data.Name.substring(1);  // Remove leading '/'
 
-    // Define the temporary folder for this server backup
-    const tempFolder = path.join(__dirname, 'temp', `dyn-${port}`);
-
-    // Create the temporary directory if it does not exist
-    fs.mkdirSync(tempFolder, { recursive: true });
-
-    // Define exclusions (folder or file patterns)
-    const excludePatterns = [
-        "**/plugins/.paper-remapped/", // Exclude specific folder
+    const containerPaths = [
+        "/minecraft/world/",
+        "/minecraft/dim-code/",
+        "/minecraft/dim-play/",
+        "/minecraft/plugins/Skript/scripts/",
+        "/minecraft/vars.json"
     ];
 
-    // Copy each folder from the container to the temporary directory
+    const tempFolder = path.join(__dirname, 'temp', `dyn-${port}`);
+    fs.mkdirSync(tempFolder, { recursive: true });
+
     for (const containerPath of containerPaths) {
-        const stream = await container.getArchive({ path: containerPath });
+        try {
+            // Determine local path based on container path
+            let localPath;
+            if (containerPath.endsWith('/')) {
+                // If it's a directory, create the corresponding directory in tempFolder
+                localPath = path.join(tempFolder, containerPath.replace(/^\/minecraft\//, ''));
+                fs.mkdirSync(localPath, { recursive: true });
+            } else {
+                // If it's a file, create the directory path and copy the file
+                localPath = path.join(tempFolder, containerPath.replace(/^\/minecraft\//, ''));
+                fs.mkdirSync(path.dirname(localPath), { recursive: true });
+            }
 
-        await new Promise((resolve, reject) => {
-            stream.pipe(
-                tar.x({
-                    cwd: tempFolder, // Extract the files to the temporary folder
-                    filter: (filePath) => {
-                        // Apply the exclusion filter
-                        if (shouldExclude(filePath, excludePatterns)) {
-                            console.log(`Excluding ${filePath} from the backup.`);
-                            return false; // Exclude this file/folder
-                        }
-                        return true; // Include this file/folder
-                    }
-                })
-                .on('finish', resolve)
-                .on('error', reject)
-            );
-        });
+			const newLocalPath = localPath.slice(0, -1);
+			const lastSlashIndex = newLocalPath.lastIndexOf('\\');
+			const result = newLocalPath.slice(0, lastSlashIndex);
 
-        console.log(`Copied ${containerPath} from container dyn-${port} to temporary folder.`);
+            // Run the cp command to copy files from container to the host
+            await execPromise(`docker cp ${containerName}:"${containerPath}" "${result}"`);
+
+            console.log(`Copied ${containerPath} from container ${containerName} to ${result}.`);
+        } catch (error) {
+            console.log(`Error copying ${containerPath}: ${error.message}. Skipping...`);
+        }
     }
 }
 
@@ -522,8 +516,7 @@ async function zipServerFiles(port, id) {
     archive.pipe(output);
 
     // Add folders to the ZIP file
-    archive.directory(path.join(tempFolder, 'world'), 'world');
-    archive.directory(path.join(tempFolder, 'plugins'), 'plugins');
+    archive.directory(tempFolder, false);
 
     await archive.finalize(); // Finalize the ZIP file
 }
