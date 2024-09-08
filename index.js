@@ -170,6 +170,41 @@ app.post("/start-server", async (req, res) => {
 		if (serversList[port].status === "running" && !serversList[port].plotId) {
 			// If there is a server with status running and no id assigned, set id to the expected id and return good reponse
 			serversList[port].plotId = id;
+			const websocketOfServer = clients.get(port);
+			const container = docker.getContainer(`dyn-${port}`);
+			await container.update({
+				// Default to 300% of CPU Core
+				CpuQuota: 30000, // 30,000 microseconds
+				CpuPeriod: 10000, // 10,000 microseconds
+			});
+
+			const serverDataZipFilePath = path.join(__dirname, 'data', `plot-${id}`, 'data.zip');
+
+			if (fs.existsSync(serverDataZipFilePath)) {
+				
+				await sendActionAndWaitForResponse(websocketOfServer, "unload-worlds");
+				// await sendActionAndWaitForResponse(websocketOfServer, "unload-plugins");
+				
+				await restoreFilesToContainer(container, port, id);
+				
+			} else {
+				console.log(`No zip file found for container dyn-${port}. Skipping restore.`);
+			}
+			await sendActionAndWaitForResponse(websocketOfServer, "load-worlds");
+		
+			// websocketOfServer.send(
+			// 	JSON.stringify({
+			// 		type: "action",
+			// 		action: "load-plugins",
+			// 	})
+			// );
+
+			await container.update({
+				// Default to 50% of CPU Core
+				CpuQuota: 5000, // 5,000 microseconds
+				CpuPeriod: 10000, // 10,000 microseconds
+			});
+
 			return res.status(200).send({ success: true, port: port, message: "Empty server found and assigned id." });
 		}
 	}
