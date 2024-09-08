@@ -7,9 +7,11 @@ const http = require("http");
 const WebSocket = require("ws");
 const dotenv = require("dotenv");
 const url = require("url");
+const { exec } = require('child_process');
+const util = require('util');
+const AdmZip = require('adm-zip');
 const archiver = require('archiver'); // Use the 'archiver' package to create a ZIP file
 const tar = require('tar'); // Required for extracting files from the Docker container
-const minimatch = require('minimatch');
 const { type } = require("os");
 
 const IDLE_SERVER_COUNT = 1;
@@ -87,6 +89,68 @@ app.get("/plot-status", async (req, res) => {
 		});
 	}
 });
+
+async function restoreFilesToContainer(container, port, id) {
+    const tempFolder = path.join(__dirname, 'temp', `dyn-${port}`);
+    const zipFilePath = path.join(__dirname, 'data', `plot-${id}`, 'data.zip');
+
+    if (!fs.existsSync(zipFilePath)) {
+        console.log(`No zip file found for container dyn-${port}. Skipping restore.`);
+        return;
+    }
+
+    // Create the temporary directory if it does not exist
+    fs.mkdirSync(tempFolder, { recursive: true });
+
+    console.log(`Extracting ${zipFilePath} to ${tempFolder}...`);
+
+    // Extract the zip file to the temporary folder
+    const zip = new AdmZip(zipFilePath);
+    zip.extractAllTo(tempFolder, true);
+
+    console.log(`Files extracted to ${tempFolder}.`);
+
+    console.log(`Restoring files from ${tempFolder} to container dyn-${port}...`);
+
+    // Create a tar archive stream from the temporary folder
+    const archiveStream = tar.c(
+        {
+            cwd: tempFolder, // Create the tarball from the temporary folder
+            gzip: true,
+            portable: true
+        },
+        ['.'] // Include all files and directories in the temporary folder
+    );
+
+    // Upload the tar archive to the /minecraft directory in the container
+    await container.putArchive(archiveStream, { path: '/minecraft' });
+
+    // Remove the temporary folder
+    fs.rmSync(tempFolder, { recursive: true, force: true });
+
+    console.log(`All files from ${tempFolder} have been restored to container dyn-${port}.`);
+}
+
+async function sendActionAndWaitForResponse(websocketOfServer, action) {
+    return new Promise((resolve, reject) => {
+        const responseHandler = (event) => {
+            const message = JSON.parse(event.data);
+            if (message.type === "action" && message.action === action && message.status === "done") {
+                websocketOfServer.removeEventListener('message', responseHandler);
+                resolve();
+            }
+        };
+
+        websocketOfServer.addEventListener('message', responseHandler);
+
+        websocketOfServer.send(
+            JSON.stringify({
+                type: "action",
+                action: action
+            })
+        );
+    });
+}
 
 app.post("/start-server", async (req, res) => {
     const { id } = req.body;
