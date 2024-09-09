@@ -448,7 +448,6 @@ async function copyFilesFromContainer(container, port) {
     const containerName = data.Name.substring(1);  // Remove leading '/'
 
     const containerPaths = [
-        "/minecraft/world/",
         "/minecraft/dim-code/",
         "/minecraft/dim-play/",
         "/minecraft/plugins/Skript/scripts/",
