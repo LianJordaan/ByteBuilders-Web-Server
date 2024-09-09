@@ -244,8 +244,8 @@ app.post("/start-server", async (req, res) => {
                 },
                 // AutoRemove: true,
                 DiskQuota: 1 * 1024 * 1024 * 1024, // 1 GB
-                Memory: 1.5 * 1024 * 1024 * 1024, // 1.5 GB
-				MemorySwap: 1.5 * 1024 * 1024 * 1024, // 1.5 GB
+                Memory: 3 * 1024 * 1024 * 1024, // 3 GB
+				MemorySwap: 3 * 1024 * 1024 * 1024, // 3 GB
 				MemorySwappiness: 100, // 100% prever swap
                 CpuQuota: 30000, // 30,000 microseconds
                 CpuPeriod: 10000, // 10,000 microseconds
@@ -420,8 +420,8 @@ async function startServerWithoutId() {
                     [`${nextPort}/tcp`]: [{ HostPort: nextPort.toString() }],
                 },
                 DiskQuota: 1 * 1024 * 1024 * 1024, // 1 GB
-                Memory: 1.5 * 1024 * 1024 * 1024, // 1.5 GB
-				MemorySwap: 1.5 * 1024 * 1024 * 1024, // 1.5 GB
+                Memory: 3 * 1024 * 1024 * 1024, // 3 GB
+				MemorySwap: 3 * 1024 * 1024 * 1024, // 3 GB
 				MemorySwappiness: 100, // 100% prever swap
                 CpuQuota: 30000, // 30,000 microseconds
                 CpuPeriod: 10000, // 10,000 microseconds
