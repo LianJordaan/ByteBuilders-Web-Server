@@ -637,6 +637,36 @@ wss.on("connection", (ws, req) => {
 					}
 				}
 			}
+
+			if (parsedMessage.type === "request-file") {
+				if (parsedMessage.worldName && parsedMessage.file && parsedMessage.fileType && parsedMessage.fileType === "world") {
+					const sourceFilePath = path.join(__dirname, 'files', 'worlds', parsedMessage.file);
+					const tempContainerPath = `/minecraft/`;
+					const finalContainerPath = `/minecraft/${parsedMessage.worldName}/`;
+		
+					if (fs.existsSync(sourceFilePath)) {
+						try {
+		
+							// Copy the file from the host to the Docker container
+							await execPromise(`docker cp "${sourceFilePath}" dyn-${id}:"${tempContainerPath}"`);
+		
+							// Rename the directory inside the container
+							await execPromise(`docker exec dyn-${id} mv ${tempContainerPath}${parsedMessage.file} ${finalContainerPath}`);
+
+							console.log(`Copied ${sourceFilePath} to container dyn-${id} at ${finalContainerPath}.`);
+							// send a response to satisfy these conditions
+							// (jsonResponse.get("type").equals("response") &&
+                            //     jsonResponse.get("status").equals("world-transfer-complete") &&
+                            //     jsonResponse.get("world").equals("play-void")) {
+							ws.send(JSON.stringify({ type: "response", status: "world-transfer-complete", world: parsedMessage.worldName }));
+						} catch (error) {
+							console.log(`Error processing file ${sourceFilePath} in container dyn-${id}: ${error.message}. Skipping...`);
+						}
+					} else {
+						console.log(`File ${sourceFilePath} does not exist. Skipping...`);
+					}
+				}
+			}
 		} catch (error) {
 			ws.send(JSON.stringify({ type: "error", message: "Invalid message format! Please use json format." }));
 		}
