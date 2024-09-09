@@ -182,7 +182,7 @@ app.post("/start-server", async (req, res) => {
 
 			if (fs.existsSync(serverDataZipFilePath)) {
 				
-				await sendActionAndWaitForResponse(websocketOfServer, "unload-worlds");
+				// await sendActionAndWaitForResponse(websocketOfServer, "unload-worlds");
 				// await sendActionAndWaitForResponse(websocketOfServer, "unload-plugins");
 				
 				await restoreFilesToContainer(container, port, id);
