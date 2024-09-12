@@ -201,7 +201,7 @@ app.post("/start-server", async (req, res) => {
 
 			await container.update({
 				// Default to 50% of CPU Core
-				CpuQuota: 5000, // 5,000 microseconds
+				CpuQuota: 500000, // 5,000 microseconds
 				CpuPeriod: 10000, // 10,000 microseconds
 			});
 
@@ -616,7 +616,7 @@ wss.on("connection", (ws, req) => {
 								const container = docker.getContainer(`dyn-${id}`);
 								await container.update({
 									// Default to 50% of CPU Core
-									CpuQuota: 5000, // 5,000 microseconds
+									CpuQuota: 500000, // 5,000 microseconds
 									CpuPeriod: 10000, // 10,000 microseconds
 								});
 								console.log(`Server dyn-${id} updated with CPU limits.`);
