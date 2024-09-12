@@ -452,7 +452,8 @@ async function copyFilesFromContainer(container, port) {
         "/minecraft/dim-code/",
         "/minecraft/dim-play/",
         "/minecraft/plugins/Skript/scripts/",
-        "/minecraft/vars.json"
+        "/minecraft/vars.json",
+        "/minecraft/data.json"
     ];
 
     const tempFolder = path.join(__dirname, 'temp', `dyn-${port}`);
@@ -602,6 +603,7 @@ wss.on("connection", (ws, req) => {
 						type: "forwarded-message",
 						from: id,
 						message: parsedMessage.message,
+						json: parsedMessage.data,
 					})
 				);
 			}
