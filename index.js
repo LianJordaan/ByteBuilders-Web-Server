@@ -12,6 +12,7 @@ const util = require('util');
 const AdmZip = require('adm-zip');
 const archiver = require('archiver'); // Use the 'archiver' package to create a ZIP file
 const tar = require('tar'); // Required for extracting files from the Docker container
+const { resolveUUID, shutdownServer } = require('./resolveUUID');
 const { type } = require("os");
 
 const IDLE_SERVER_COUNT = 1;
@@ -680,6 +681,12 @@ wss.on("connection", (ws, req) => {
 	// Send initial message
 	ws.send(JSON.stringify({ type: "info", message: "Connection established" }));
 });
+
+// Register the endpoint
+app.get('/resolve-uuid', resolveUUID);
+
+// Register the shutdown endpoint
+app.post('/shutdown', shutdownServer);
 
 const port = process.env.PORT || 3000;
 server.listen(port, () => {
