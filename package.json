@@ -12,6 +12,7 @@
   "dependencies": {
     "adm-zip": "^0.5.16",
     "archiver": "^7.0.1",
+    "axios": "^1.7.7",
     "dockerode": "^4.0.2",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
