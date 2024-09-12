@@ -3,3 +3,4 @@ serverInfo.json
 .env
 /data/*
 /temp/*
+cache.json
