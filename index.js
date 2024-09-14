@@ -12,7 +12,8 @@ const util = require('util');
 const AdmZip = require('adm-zip');
 const archiver = require('archiver'); // Use the 'archiver' package to create a ZIP file
 const tar = require('tar'); // Required for extracting files from the Docker container
-const { resolveUUID, shutdownServer } = require('./resolveUUID');
+const resolveUUID = require('./resolveUUID');
+const dbManagement = require('./db/dbManagement');
 const { type } = require("os");
 
 const IDLE_SERVER_COUNT = 1;
@@ -153,12 +154,43 @@ async function sendActionAndWaitForResponse(websocketOfServer, action) {
     });
 }
 
+app.post("/create-plot", async (req, res) => {
+	const { name, size, ownerUuid } = req.body;
+	if (!name || !size || !ownerUuid) {
+		return res.status(400).send({ success: false, message: "name, size, and ownerUuid are required." });
+	}
+	const allowedSizes = ['128', '256', '512', '1024', '2048', 'inf'];
+	if (!allowedSizes.includes(size)) {
+		return res.status(400).send({ success: false, message: `Invalid size value. Allowed values are ${allowedSizes.join(', ')}.` });
+	}
+
+	const plotId = await dbManagement.findFirstUnusedPlotId();
+	const plotData = {
+		name,
+		size,
+		ownerUuid,
+		_id: plotId,
+	};
+	try {
+		const plot = await dbManagement.createPlot(plotData);
+		return res.status(201).send({ success: true, message: "Plot created successfully.", id: plot.id });
+	} catch (error) {
+		console.error("Error creating plot:", error);
+		return res.status(500).send({ success: false, message: "Failed to create plot." });
+	}
+});
+
 app.post("/start-server", async (req, res) => {
     const { id } = req.body;
 
     if (!id) {
         return res.status(400).send({ success: false, message: "id is required." });
     }
+
+	const plotExists = await dbManagement.plotExistsById(id);
+	if (!plotExists) {
+		return res.status(410).send({ success: false, port: port, message: "Plot already exists." });
+	}
 
 	for (const port of Object.keys(serversList)) {
 		if (serversList[port].status === "running" && serversList[port].plotId == id) {
@@ -686,9 +718,6 @@ wss.on("connection", (ws, req) => {
 
 // Register the endpoint
 app.get('/resolve-uuid', resolveUUID);
-
-// Register the shutdown endpoint
-app.post('/shutdown', shutdownServer);
 
 const port = process.env.PORT || 3000;
 server.listen(port, () => {
