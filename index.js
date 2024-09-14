@@ -159,7 +159,7 @@ app.post("/create-plot", async (req, res) => {
 	if (!name || !size || !ownerUuid) {
 		return res.status(400).send({ success: false, message: "name, size, and ownerUuid are required." });
 	}
-	const allowedSizes = ['128', '256', '512', '1024', '2048', 'inf'];
+	const allowedSizes = ['128', '256', '512', '1024', '2048', '0'];
 	if (!allowedSizes.includes(size)) {
 		return res.status(400).send({ success: false, message: `Invalid size value. Allowed values are ${allowedSizes.join(', ')}.` });
 	}
