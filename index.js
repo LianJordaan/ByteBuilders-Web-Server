@@ -15,6 +15,7 @@ const tar = require('tar'); // Required for extracting files from the Docker con
 const resolveUUID = require('./resolveUUID');
 const dbManagement = require('./db/dbManagement');
 const { type } = require("os");
+const Player = require("./db/models/playerModel");
 
 const IDLE_SERVER_COUNT = 1;
 const plotsPerRank = {
@@ -364,6 +365,15 @@ app.post("/start-server", async (req, res) => {
 			} else {
 				console.log(`No zip file found for container dyn-${port}. Skipping restore.`);
 			}
+
+			const plot = await dbManagement.getPlotById(id);
+			websocketOfServer.send(
+				JSON.stringify({
+					type: "action",
+					action: "set-size",
+					size: plot.size
+				})
+			);
 			await sendActionAndWaitForResponse(websocketOfServer, "load-worlds");
 		
 			// websocketOfServer.send(
