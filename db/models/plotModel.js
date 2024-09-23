@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const plotSchema = new mongoose.Schema({
     _id: { type: Number, required: true },
     name: { type: String, required: true },
+    desciption: { type: String, required: true },
     bannedPlayers: { type: [String], default: [] },
     whitelistedPlayers: { type: [String], default: [] },
     size: {
