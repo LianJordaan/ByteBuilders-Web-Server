@@ -1,11 +1,11 @@
 const mongoose = require('mongoose');
 
 const playerSchema = new mongoose.Schema({
-    uuid: { type: String, required: true },
+    uuid: { type: String, required: true, unique: true },
     username: { type: String, required: true },
     favorites: { type: [Number], default: [] },
     lastLogin: { type: Date },
-    firstLogin: { type: Date },
+    firstLogin: { type: Date, required: true },
     settings: { type: Map, of: String },
     preferences: { type: Map, of: String },
     tokens: { type: Number },
