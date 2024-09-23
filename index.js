@@ -279,13 +279,30 @@ app.delete("/delete-plot", async (req, res) => {
 });
 
 app.post("/create-plot", async (req, res) => {
-	const { name, size, ownerUuid } = req.body;
+	const { name, size, ownerUuid, rank } = req.body;
 	if (!name || !size || !ownerUuid) {
 		return res.status(400).send({ success: false, message: "name, size, and ownerUuid are required." });
 	}
 	const allowedSizes = ['128', '256', '512', '1024', '2048', '0'];
-	if (!allowedSizes.includes(size)) {
+	if (!allowedSizes.includes(size.toString())) {
 		return res.status(400).send({ success: false, message: `Invalid size value. Allowed values are ${allowedSizes.join(', ')}.` });
+	}
+
+	let maxPlotsOfType = plotsPerRank[rank][size];
+	const playerObject = await dbManagement.getPlayerByUuid(ownerUuid);
+	maxPlotsOfType += playerObject.plotSizes[size];
+
+	let ownedPlotsOfType = 0;
+
+	const ownedPlots = await dbManagement.getAllPlotsByPlayer(ownerUuid);
+	for (const plot of ownedPlots) {
+		if (plot.size == size) {
+			ownedPlotsOfType += 1;
+		}
+	}
+
+	if (ownedPlotsOfType >= maxPlotsOfType) {
+		return res.status(400).send({ success: false, message: `You already own the maximum number of plots of this type.` });
 	}
 
 	const plotId = await dbManagement.findFirstUnusedPlotId();
