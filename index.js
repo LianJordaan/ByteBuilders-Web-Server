@@ -69,6 +69,15 @@ const plotsPerRank = {
 	},
 }
 
+const plotSizeToName = {
+	"128": "Small",
+	"256": "Basic",
+	"512": "Large",
+	"1024": "Massive",
+	"2048": "Mega",
+	"0": "Super"
+}
+
 const dataFolderPath = path.join(__dirname, 'data');
 if (!fs.existsSync(dataFolderPath)) {
     fs.mkdirSync(dataFolderPath);
@@ -205,6 +214,44 @@ async function sendActionAndWaitForResponse(websocketOfServer, action) {
     });
 }
 
+app.get('/player/get-plots', async (req, res) => {
+    const { uuid } = req.body;
+
+    if (!uuid) {
+        return res.status(400).json({ error: 'UUID is required' });
+    }
+
+    try {
+        // Check if the player exists in the database
+        const player = await dbManagement.playerExistsByUuid(uuid);
+
+        if (!player) {
+            return res.status(404).json({ error: 'Player not found' });
+        }
+
+		const plots = await dbManagement.getAllPlotsByPlayer(uuid);
+		const plotCounts = {};
+
+		for (const plot of plots) {
+			if (plotCounts[plot.size]) {
+				plotCounts[plotSizeToName[plot.size.toString()]] += 1;
+			} else {
+				plotCounts[plotSizeToName[plot.size.toString()]] = 1;
+			}
+		}
+
+		const json = {
+			plots: plots,
+			plotCounts: plotCounts
+		}
+
+        return res.json(json);
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 app.post('/player/login', async (req, res) => {
     const { uuid, username } = req.body;
 
@@ -280,7 +327,7 @@ app.delete("/delete-plot", async (req, res) => {
 });
 
 app.post("/create-plot", async (req, res) => {
-	const { name, size, ownerUuid, rank } = req.body;
+	const { name, desciption, size, ownerUuid, rank } = req.body;
 	if (!name || !size || !ownerUuid) {
 		return res.status(400).send({ success: false, message: "name, size, and ownerUuid are required." });
 	}
@@ -309,6 +356,7 @@ app.post("/create-plot", async (req, res) => {
 	const plotId = await dbManagement.findFirstUnusedPlotId();
 	const plotData = {
 		name,
+		desciption,
 		size,
 		ownerUuid,
 		_id: plotId,
