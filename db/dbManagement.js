@@ -1,11 +1,56 @@
 const mongoose = require('mongoose');
 const Plot = require('./models/plotModel'); // Import your Plot model
+const Player = require('./models/playerModel'); // Import your Player model
 
 // Connect to MongoDB
-const uri = 'mongodb://127.0.0.1:27017/bytebuilders';
+const uri = 'mongodb://192.168.0.125:27017/bytebuilders';
 mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
     .then(() => console.log('MongoDB connected'))
     .catch(err => console.error('MongoDB connection error:', err));
+
+// Function to get player data by UUID
+async function getPlayerByUuid(uuid) {
+    try {
+        const player = await Player.findOne({ uuid });
+        if (!player) throw new Error('Player not found');
+        return player;
+    } catch (error) {
+        throw new Error('Error retrieving player: ' + error.message);
+    }
+}
+
+// Function to see if a player exists by UUID
+async function playerExistsByUuid(uuid) {
+    try {
+        const player = await Player.findOne({ uuid });
+        return player !== null;
+    } catch (err) {
+        console.error('Error checking player existence by UUID:', err);
+        return false;
+    }
+}
+
+// Function to update player data using uuid instead of id
+async function updatePlayer(playerUuid, updateData) {
+    try {
+        const player = await Player.findOneAndUpdate({ uuid: playerUuid }, updateData, { new: true });
+        if (!player) throw new Error('Player not found');
+        return player;
+    } catch (error) {
+        throw new Error('Error updating player: ' + error.message);
+    }
+}
+
+// Function to create a new player
+async function createPlayer(playerData) {
+    try {
+        const player = new Player(playerData);
+        await player.save();
+        return player;
+    } catch (error) {
+        throw new Error('Error creating player: ' + error.message);
+    }
+}
 
 // Function to create a new plot
 async function createPlot(plotData) {
@@ -15,6 +60,16 @@ async function createPlot(plotData) {
         return plot;
     } catch (error) {
         throw new Error('Error creating plot: ' + error.message);
+    }
+}
+
+// Function to get all plots from a certain player uuid
+async function getAllPlotsByPlayer(playerUuid) {
+    try {
+        const plots = await Plot.find({ ownerUuid: playerUuid });
+        return plots;
+    } catch (error) {
+        throw new Error('Error retrieving plots: ' + error.message);
     }
 }
 
@@ -92,14 +147,14 @@ const plotExistsByField = async (fieldName, value) => {
 async function findFirstUnusedPlotId() {
     try {
         // Find all existing plot IDs
-        const plots = await Plot.find({}, 'id').sort({ id: 1 }).exec();
+        const plots = await Plot.find({}, '_id').sort({ _id: 1 }).exec();
 
         // Initialize the ID to check
         let nextId = 1;
 
         // Iterate through existing IDs to find the first gap
         for (const plot of plots) {
-            if (plot.id !== nextId) {
+            if (plot._id !== nextId) {
                 // If there's a gap, return the first missing ID
                 return nextId;
             }
@@ -124,4 +179,9 @@ module.exports = {
     plotExistsById,
     plotExistsByField,
 	findFirstUnusedPlotId,
+	getPlayerByUuid,
+	playerExistsByUuid,
+	updatePlayer,
+	createPlayer,
+    getAllPlotsByPlayer,
 };
