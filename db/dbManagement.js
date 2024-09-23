@@ -1,9 +1,12 @@
 const mongoose = require('mongoose');
 const Plot = require('./models/plotModel'); // Import your Plot model
 const Player = require('./models/playerModel'); // Import your Player model
+const dotenv = require("dotenv");
+
+dotenv.config();
 
 // Connect to MongoDB
-const uri = 'mongodb://192.168.0.125:27017/bytebuilders';
+const uri = 'mongodb://bytebuilders:' + process.env.MONGODB_PASSWORD + '@192.168.0.125:27017/bytebuilders';
 mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
     .then(() => console.log('MongoDB connected'))
     .catch(err => console.error('MongoDB connection error:', err));
