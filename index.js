@@ -204,6 +204,80 @@ async function sendActionAndWaitForResponse(websocketOfServer, action) {
     });
 }
 
+app.post('/player/login', async (req, res) => {
+    const { uuid, username } = req.body;
+
+    if (!uuid || !username) {
+        return res.status(400).json({ error: 'UUID and username are required' });
+    }
+
+    try {
+        // Check if the player already exists in the database
+        const player = await dbManagement.playerExistsByUuid(uuid); // Correct usage of `uuid`
+
+        if (player) {
+			let newPlayerData = await dbManagement.getPlayerByUuid(uuid);
+            // Player exists, check if the username needs to be updated
+            newPlayerData.username = username;
+            newPlayerData.lastLogin = new Date();
+            await dbManagement.updatePlayer(uuid, newPlayerData);
+            console.log(`Updated player ${uuid} with new username: ${username}`);
+        } else {
+            // Player does not exist, create a new one
+            const newPlayer = new Player({
+                uuid: uuid, // Correct usage of `uuid`
+                username: username,
+                firstLogin: new Date(),
+                lastLogin: new Date(),
+                // Set other default fields if needed
+            });
+            await newPlayer.save();
+            console.log(`Created new player ${uuid} with username: ${username}`);
+        }
+
+        return res.status(200).json({ success: true });
+    } catch (error) {
+        console.error(`Error handling player data: ${error}`);
+        return res.status(500).json({ error: 'Error processing player data' });
+    }
+});
+
+app.delete("/delete-plot", async (req, res) => {
+	const { plotId, uuid, bypass } = req.body;
+	if (!plotId) {
+		return res.status(400).send({ success: false, message: "plotId is required." });
+	}
+
+	const plotExists = await dbManagement.plotExistsById(plotId);
+    if (!plotExists) {
+        return res.status(404).send({ success: false, message: "Plot does not exist." });
+    }
+
+	for (const port of Object.keys(serversList)) {
+		if (serversList[port].status === "running" && serversList[port].plotId == id) {
+			return res.status(409).send({ success: false, port: port, message: "Server is already running." });
+		}
+	}
+
+	try {
+		let plot = await dbManagement.getPlotById(plotId);
+		if (plot.ownerUuid !== uuid) {
+			if (!bypass)	{
+				return res.status(403).send({ success: false, message: "You do not have permission to delete this plot." });
+			}
+		}
+		await dbManagement.deletePlot(plotId);
+		fs.rmSync(path.join(__dirname, 'data', `plot-${plotId}`), { recursive: true }); 
+		return res.status(200).send({ success: true, message: "Plot deleted successfully.", id: plotId });
+	} catch (error) {
+		console.error("Error deleting plot:", error);
+		return res.status(500).send({
+			success: false,
+			message: "Failed to delete plot.",
+		});
+	}
+});
+
 app.post("/create-plot", async (req, res) => {
 	const { name, size, ownerUuid } = req.body;
 	if (!name || !size || !ownerUuid) {
