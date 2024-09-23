@@ -17,6 +17,56 @@ const dbManagement = require('./db/dbManagement');
 const { type } = require("os");
 
 const IDLE_SERVER_COUNT = 1;
+const plotsPerRank = {
+	"default": {
+		"128": 2,
+		"256": 1,
+		"512": 0,
+		"1024": 0,
+		"2048": 0,
+		"0": 0
+	},
+	"noble": {
+		"128": 2,
+		"256": 2,
+		"512": 0,
+		"1024": 0,
+		"2048": 0,
+		"0": 0
+	},
+	"mythic": {
+		"128": 3,
+		"256": 2,
+		"512": 1,
+		"1024": 0,
+		"2048": 0,
+		"0": 0
+	},
+	"emperor": {
+		"128": 4,
+		"256": 3,
+		"512": 2,
+		"1024": 1,
+		"2048": 0,
+		"0": 0
+	},
+	"royal": {
+		"128": 5,
+		"256": 4,
+		"512": 3,
+		"1024": 2,
+		"2048": 1,
+		"0": 0
+	},
+	"media": {
+		"128": 5,
+		"256": 4,
+		"512": 3,
+		"1024": 2,
+		"2048": 1,
+		"0": 1
+	},
+}
 
 const dataFolderPath = path.join(__dirname, 'data');
 if (!fs.existsSync(dataFolderPath)) {
