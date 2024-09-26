@@ -357,15 +357,16 @@ app.post("/create-plot", async (req, res) => {
 		}
 	}
 
-	if (ownedPlotsOfType >= maxPlotsOfType) {
-		return res.status(400).send({ success: false, message: `You already own the maximum number of plots of this type.` });
-	}
+	// if (ownedPlotsOfType >= maxPlotsOfType) {
+	// 	return res.status(400).send({ success: false, message: `You already own the maximum number of plots of this type.` });
+	// }
 
 	const plotId = await dbManagement.findFirstUnusedPlotId();
 	const plotData = {
 		name,
 		desciption,
 		size,
+		sizeName: plotSizeToName[size.toString()], 
 		ownerUuid,
 		_id: plotId,
 	};
