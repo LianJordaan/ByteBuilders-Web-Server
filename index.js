@@ -336,7 +336,7 @@ app.delete("/delete-plot", async (req, res) => {
 
 app.post("/create-plot", async (req, res) => {
 	const { name, desciption, size, ownerUuid, rank } = req.body;
-	if (!name || !size || !ownerUuid) {
+	if (!name || (!size && size.toString() !== '0') || !ownerUuid) {
 		return res.status(400).send({ success: false, message: "name, size, and ownerUuid are required." });
 	}
 	const allowedSizes = ['128', '256', '512', '1024', '2048', '0'];
