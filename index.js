@@ -232,12 +232,17 @@ app.post('/player/get-plots', async (req, res) => {
 		const plots = await dbManagement.getAllPlotsByPlayer(uuid);
 		const plotCounts = {};
 
+		// Ordered list of sizes to ensure "Super" is last
+		const orderedSizes = ["128", "256", "512", "1024", "2048", "0"];
+
+		for (let i = 0; i < orderedSizes.length; i++) {
+			const key = orderedSizes[i];
+			plotCounts[plotSizeToName[key]] = 0; // Initialize with 0 for each plot size
+		}
+		
+
 		for (const plot of plots) {
-			if (plotCounts[plot.size]) {
-				plotCounts[plotSizeToName[plot.size.toString()]] += 1;
-			} else {
-				plotCounts[plotSizeToName[plot.size.toString()]] = 1;
-			}
+			plotCounts[plotSizeToName[plot.size.toString()]] += 1;
 		}
 
 		const json = {
