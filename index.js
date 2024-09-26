@@ -307,8 +307,8 @@ app.delete("/delete-plot", async (req, res) => {
     }
 
 	for (const port of Object.keys(serversList)) {
-		if (serversList[port].status === "running" && serversList[port].plotId == id) {
-			return res.status(409).send({ success: false, port: port, message: "Server is already running." });
+		if (serversList[port].status === "running" && serversList[port].plotId == plotId) {
+			return res.status(409).send({ success: false, port: port, message: "Server is running. Stop the server before deleting the plot." });
 		}
 	}
 
@@ -320,7 +320,10 @@ app.delete("/delete-plot", async (req, res) => {
 			}
 		}
 		await dbManagement.deletePlot(plotId);
-		fs.rmSync(path.join(__dirname, 'data', `plot-${plotId}`), { recursive: true }); 
+		try {
+			fs.rmSync(path.join(__dirname, 'data', `plot-${plotId}`), { recursive: true }); 
+		} catch (error) {
+		}
 		return res.status(200).send({ success: true, message: "Plot deleted successfully.", id: plotId });
 	} catch (error) {
 		console.error("Error deleting plot:", error);
