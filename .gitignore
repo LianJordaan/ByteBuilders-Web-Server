@@ -4,3 +4,4 @@ serverInfo.json
 /data/*
 /temp/*
 cache.json
+.vscode/settings.json
