@@ -214,7 +214,7 @@ async function sendActionAndWaitForResponse(websocketOfServer, action) {
     });
 }
 
-app.get('/player/get-plots', async (req, res) => {
+app.post('/player/get-plots', async (req, res) => {
     const { uuid } = req.body;
 
     if (!uuid) {
