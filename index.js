@@ -781,20 +781,28 @@ function loadServerInfo() {
 	}
 }
 
-// Graceful shutdown handler to save server info
-process.on("SIGTERM", () => {
-	console.log("SIGTERM signal received: closing HTTP server");
-	saveServerInfo();
-	// Close other connections and cleanup...
-	process.exit(0);
-});
+// Graceful shutdown handler
+function gracefulShutdown(signal) {
+    console.log(`${signal} signal received: sending shutdown message to clients`);
 
-process.on("SIGINT", () => {
-	console.log("SIGINT signal received: closing HTTP server");
-	saveServerInfo();
-	// Close other connections and cleanup...
-	process.exit(0);
-});
+    // Send a shutdown message to all connected clients
+    clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({ type: 'shutdown', delay: 5, attempts: 3 }));
+        }
+    });
+
+    // Wait for a few seconds to allow clients to disconnect
+    setTimeout(() => {
+        console.log('Closing HTTP server and other connections');
+        saveServerInfo(); // Implement your saving logic here
+        process.exit(0); // Exit after cleanup
+    }, 0); // 5 seconds delay before shutdown
+}
+
+// Graceful shutdown handling for SIGTERM and SIGINT
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 const clients = new Map(); // Store connected clients with unique IDs
 
