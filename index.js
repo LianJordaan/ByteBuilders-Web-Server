@@ -78,6 +78,8 @@ const plotSizeToName = {
 	"0": "Super"
 }
 
+const orderedSizes = ["128", "256", "512", "1024", "2048", "0"];
+
 const dataFolderPath = path.join(__dirname, 'data');
 if (!fs.existsSync(dataFolderPath)) {
     fs.mkdirSync(dataFolderPath);
@@ -232,9 +234,6 @@ app.post('/player/get-plots', async (req, res) => {
 		const plots = await dbManagement.getAllPlotsByPlayer(uuid);
 		const plotCounts = {};
 
-		// Ordered list of sizes to ensure "Super" is last
-		const orderedSizes = ["128", "256", "512", "1024", "2048", "0"];
-
 		for (let i = 0; i < orderedSizes.length; i++) {
 			const key = orderedSizes[i];
 			plotCounts[plotSizeToName[key]] = 0; // Initialize with 0 for each plot size
@@ -251,6 +250,73 @@ app.post('/player/get-plots', async (req, res) => {
 		}
 
         return res.json(json);
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.post('/player/get-limits', async (req, res) => {
+    const { uuid, rank } = req.body;
+
+    // Validate input
+    if (!uuid || !rank) {
+        return res.status(400).json({ error: 'UUID and rank are required' });
+    }
+
+    try {
+        // Check if the player exists in the database
+        const playerExists = await dbManagement.playerExistsByUuid(uuid);
+
+        if (!playerExists) {
+            return res.status(404).json({ error: 'Player not found' });
+        }
+
+        const player = await dbManagement.getPlayerByUuid(uuid);
+
+        // Get all plots owned by the player
+        const playerPlots = await dbManagement.getAllPlotsByPlayer(uuid);
+
+        // Calculate available plot limits based on the player's rank
+        const limitsForRank = plotsPerRank[rank.toLowerCase()];
+
+        if (!limitsForRank) {
+            return res.status(400).json({ error: 'Invalid rank specified' });
+        }
+
+        // Initialize remaining and used plot counts
+        let availablePlots = { ...limitsForRank };
+
+        Object.entries(player.plotSizes).forEach(([size]) => {
+            availablePlots[size] = (availablePlots[size] || 0) + player.plotSizes[size];
+        });
+
+        let usedPlots = {};
+
+        // Loop through player's plots and adjust available plot slots
+        playerPlots.forEach(plot => {
+            const plotSize = plot.size.toString();
+            if (availablePlots[plotSize] !== undefined) {
+                availablePlots[plotSize] = Math.max(availablePlots[plotSize] - 1, 0);
+                usedPlots[plotSize] = (usedPlots[plotSize] || 0) + 1;
+            }
+        });
+
+        // Prepare response object using orderedSizes
+        let responseJson = {};
+        for (const size of orderedSizes) {
+            const plotSizeName = plotSizeToName[size];
+            const limit = availablePlots[size] || 0;
+            responseJson[plotSizeName] = {
+                max: limitsForRank[size] + player.plotSizes[size],
+                used: usedPlots[size] || 0,
+                remaining: limit,
+                size: size === "0" ? "Infinite" : size + "x" + size
+            };
+        }
+
+        return res.json(responseJson);
+
     } catch (error) {
         console.error(error);
         return res.status(500).json({ error: 'Internal server error' });
