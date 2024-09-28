@@ -311,7 +311,8 @@ app.post('/player/get-limits', async (req, res) => {
                 max: limitsForRank[size] + player.plotSizes[size],
                 used: usedPlots[size] || 0,
                 remaining: limit,
-                size: size === "0" ? "Infinite" : size + "x" + size
+                sizeName: size === "0" ? "Infinite" : size + "x" + size,
+				size: size,
             };
         }
 
@@ -401,9 +402,12 @@ app.delete("/delete-plot", async (req, res) => {
 });
 
 app.post("/create-plot", async (req, res) => {
-	const { name, desciption, size, ownerUuid, rank } = req.body;
-	if (!name || (!size && size.toString() !== '0') || !ownerUuid) {
-		return res.status(400).send({ success: false, message: "name, size, and ownerUuid are required." });
+	const { name, description, size, ownerUuid, rank } = req.body;
+
+	console.log(req.body);
+
+	if (!name || (!size && size.toString() !== '0') || !ownerUuid || !rank) {
+		return res.status(400).send({ success: false, message: "name, size, ownerUuid, and rank are required." });
 	}
 	const allowedSizes = ['128', '256', '512', '1024', '2048', '0'];
 	if (!allowedSizes.includes(size.toString())) {
@@ -423,14 +427,14 @@ app.post("/create-plot", async (req, res) => {
 		}
 	}
 
-	// if (ownedPlotsOfType >= maxPlotsOfType) {
-	// 	return res.status(400).send({ success: false, message: `You already own the maximum number of plots of this type.` });
-	// }
+	if (ownedPlotsOfType >= maxPlotsOfType) {
+		return res.status(400).send({ success: false, message: `You already own the maximum number of plots of this type.`, shortMessage: "limit_reached", plotType: plotSizeToName[size.toString()] });
+	}
 
 	const plotId = await dbManagement.findFirstUnusedPlotId();
 	const plotData = {
 		name,
-		desciption,
+		description,
 		size,
 		sizeName: plotSizeToName[size.toString()], 
 		ownerUuid,
