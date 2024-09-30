@@ -216,6 +216,34 @@ async function sendActionAndWaitForResponse(websocketOfServer, action) {
     });
 }
 
+app.post('/player/get-plot', async (req, res) => {
+	const { uuid, plotId } = req.body;
+
+	if (!uuid || !plotId) {
+		return res.status(400).json({ error: 'UUID and plotId are required' });
+	}
+
+	try {
+		// Check if the player exists in the database
+		const player = await dbManagement.playerExistsByUuid(uuid);
+
+		if (!player) {
+			return res.status(404).json({ error: 'Player not found' });
+		}
+
+		if (!dbManagement.plotExistsById(plotId)) {
+			return res.status(404).json({ error: 'Plot not found' });
+		}
+
+		const plot = await dbManagement.getPlotById(plotId);
+
+		return res.json(plot);
+	} catch (error) {
+		console.error(error);
+		return res.status(500).json({ error: 'Internal server error' });
+	}
+});
+
 app.post('/player/get-plots', async (req, res) => {
     const { uuid } = req.body;
 
