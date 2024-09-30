@@ -8,8 +8,8 @@ const playerSchema = new mongoose.Schema({
     firstLogin: { type: Date, required: true },
     settings: { type: Map, of: String },
     preferences: { type: Map, of: String },
-    tokens: { type: Number },
-    bytes: { type: Number },
+    tokens: { type: Number, default: 0 },
+    bits: { type: Number, default: 0 },
     plotSizes: {
         128: { type: Number, default: 0 },
         256: { type: Number, default: 0 },
