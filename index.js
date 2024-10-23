@@ -789,7 +789,6 @@ async function copyFilesFromContainer(container, port) {
     const containerPaths = [
         "/minecraft/dim-code/",
         "/minecraft/dim-play/",
-        "/minecraft/plugins/Skript/scripts/",
         "/minecraft/vars.json",
         "/minecraft/data.json"
     ];
