@@ -244,6 +244,16 @@ app.post('/player/get-plot', async (req, res) => {
 	}
 });
 
+app.get('/get-all-plots', async (req, res) => {
+	try {
+		const plots = await dbManagement.getAllPlots();
+		return res.json( plots );
+	} catch (error) {
+		console.error(error);
+		return res.status(500).json({ error: 'Internal server error' });
+	}
+});
+
 app.post('/player/get-plots', async (req, res) => {
     const { uuid } = req.body;
 
